@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digital Employee</title>
+<style>
+:root{--bg:#faf9f6;--card:#fff;--ink:#1d1d1b;--mute:#6b6a65;--line:#e5e3dc;--acc:#2f5d50;--accink:#fff;--warn:#fff4dc;--warnline:#e2b34a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--card:#222220;--ink:#eeede8;--mute:#9a988f;--line:#35342f;--acc:#7fc4ae;--accink:#10201b;--warn:#3a3118;--warnline:#8a6d22}}
+:root[data-theme="dark"]{--bg:#171716;--card:#222220;--ink:#eeede8;--mute:#9a988f;--line:#35342f;--acc:#7fc4ae;--accink:#10201b;--warn:#3a3118;--warnline:#8a6d22}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:0 0 2px}.sub{color:var(--mute);margin:0 0 20px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px}
+textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;background:var(--bg);color:var(--ink);resize:vertical}
+label{font-size:14px;font-weight:600;display:block;margin:8px 0 4px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;border-radius:10px;cursor:pointer}
+button.go{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+ul{list-style:none;margin:0;padding:0}li{padding:6px 0;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:flex-start}li:last-child{border:0}
+.empty{color:var(--mute);font-size:14px}
+.ic{width:20px;flex:none;text-align:center}
+.done{color:var(--mute);text-decoration:line-through}
+.ask{background:var(--warn);border:1px solid var(--warnline)}
+.ask pre{white-space:pre-wrap;font:inherit;margin:6px 0 0;max-height:200px;overflow:auto}
+#sum{white-space:pre-wrap}
+.log{font-size:13px;color:var(--mute)}
+.err{color:#b3261e;font-size:14px}
+</style></head><body><main>
+<h1>Digital Employee</h1>
+<p class="sub">Tell me what you need done. I'll plan it, do it, and ask before anything consequential.</p>
+
+<div class="card">
+<label for="goal">What should I do?</label>
+<textarea id="goal" rows="2" placeholder="e.g. Turn my notes into tasks and write a summary for my manager"></textarea>
+<label for="notes">Your notes (optional)</label>
+<textarea id="notes" rows="5" placeholder="Paste notes, research or a messy to-do list here"></textarea>
+<div class="row"><button class="go" id="run">Do it</button><button id="ex">Try an example</button><span id="msg" class="err"></span></div>
+</div>
+
+<div id="ask"></div>
+
+<div class="card"><h2>Plan</h2><ul id="plan"><li class="empty">Nothing yet.</li></ul></div>
+<div class="card"><h2>Task list</h2><ul id="tasks"></ul></div>
+<div class="card"><h2>Finished deliverable</h2><div id="sum" class="empty">Nothing yet.</div>
+<div class="row"><button id="copy" hidden>Copy</button></div></div>
+<div class="card"><h2>Activity</h2><div id="log" class="log">Nothing yet.</div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let plan=[],tasks=[],summary='',log=[],nid=1;
+try{const t=JSON.parse(localStorage.getItem('de_tasks')||'[]');if(Array.isArray(t)){tasks=t;nid=t.reduce((m,x)=>Math.max(m,x.id),0)+1}}catch(e){}
+const save=()=>{try{localStorage.setItem('de_tasks',JSON.stringify(tasks))}catch(e){}};
+const note=s=>{log.push(s);render()};
+
+function render(){
+ $('plan').innerHTML=plan.length?plan.map(p=>`<li><span class="ic">${p.done?'✅':'⬜'}</span><span class="${p.done?'done':''}">${esc(p.text)}${p.result?`<br><small class="log">${esc(p.result)}</small>`:''}</span></li>`).join(''):'<li class="empty">Nothing yet.</li>';
+ $('tasks').innerHTML=tasks.length?tasks.map(t=>`<li><input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}><span class="${t.done?'done':''}">${esc(t.title)}${t.due?` <small class="log">· ${esc(t.due)}</small>`:''}</span></li>`).join(''):'<li class="empty">No tasks.</li>';
+ $('sum').textContent=summary||'Nothing yet.';$('sum').className=summary?'':'empty';$('copy').hidden=!summary;
+ $('log').innerHTML=log.length?log.map(esc).join('<br>'):'Nothing yet.';
+}
+$('tasks').onchange=e=>{const t=tasks.find(x=>x.id==e.target.dataset.id);if(t){t.done=e.target.checked;save();render()}};
+$('copy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(summary).then(()=>{$('copy').textContent='Copied'})};
+
+function approve(title,body){
+ return new Promise(res=>{
+  const d=$('ask');d.innerHTML=`<div class="card ask"><strong>Approval needed: ${esc(title)}</strong><pre>${esc(body)}</pre><div class="row"><button class="go" id="y">Approve</button><button id="n">Decline</button></div></div>`;
+  d.scrollIntoView({block:'center'});
+  $('y').onclick=()=>{d.innerHTML='';res(true)};$('n').onclick=()=>{d.innerHTML='';res(false)};
+ });
+}
+
+const tools=[
+ {name:'make_plan',description:'Set the plan: a short ordered list of steps. Call this first.',inputSchema:{type:'object',properties:{steps:{type:'array',items:{type:'string'}}},required:['steps']},
+  execute:({steps})=>{plan=steps.map(s=>({text:s,done:false}));note('Plan created ('+steps.length+' steps)');return 'ok'}},
+ {name:'finish_step',description:'Mark a plan step done (1-based number) with a one-line result.',inputSchema:{type:'object',properties:{n:{type:'integer'},result:{type:'string'}},required:['n']},
+  execute:({n,result})=>{const p=plan[n-1];if(!p)throw new Error('no such step');p.done=true;p.result=result||'';render();return 'ok'}},
+ {name:'list_tasks',description:'Return the current task list.',inputSchema:{type:'object',properties:{}},
+  execute:()=>JSON.stringify(tasks)},
+ {name:'add_task',description:'Add a task. Skip it if a similar task already exists.',inputSchema:{type:'object',properties:{title:{type:'string'},due:{type:'string'}},required:['title']},
+  execute:({title,due})=>{const t={id:nid++,title,due:due||'',done:false};tasks.push(t);save();note('Added task: '+title);return JSON.stringify(t)}},
+ {name:'complete_task',description:'Mark a task done by id.',inputSchema:{type:'object',properties:{id:{type:'integer'}},required:['id']},
+  execute:({id})=>{const t=tasks.find(x=>x.id===id);if(!t)throw new Error('no such task');t.done=true;save();note('Completed task: '+t.title);return 'ok'}},
+ {name:'delete_task',description:'Delete a task by id. Needs the user\'s approval.',inputSchema:{type:'object',properties:{id:{type:'integer'}},required:['id']},
+  execute:async({id})=>{const t=tasks.find(x=>x.id===id);if(!t)throw new Error('no such task');
+   if(!await approve('delete a task','"'+t.title+'"')){note('Delete declined: '+t.title);return 'USER DECLINED. Do not delete.'}
+   tasks=tasks.filter(x=>x.id!==id);save();note('Deleted task: '+t.title);return 'deleted'}},
+ {name:'save_summary',description:'Save the finished summary (plain text, short, scannable). Overwrites the previous one.',inputSchema:{type:'object',properties:{text:{type:'string'}},required:['text']},
+  execute:({text})=>{summary=text;note('Summary written');return 'ok'}},
+ {name:'send_summary',description:'Send the summary by email to someone. Needs the user\'s approval. Only call if the user asked for sending.',inputSchema:{type:'object',properties:{to:{type:'string'},subject:{type:'string'},body:{type:'string'}},required:['to','subject','body']},
+  execute:async({to,subject,body})=>{
+   if(!await approve('send an email','To: '+to+'\nSubject: '+subject+'\n\n'+body)){note('Send declined');return 'USER DECLINED. Do not send.'}
+   note('Email sent (demo, not really sent) to '+to);return 'sent (demo)'}}
+];
+
+const SYS=`You are a careful personal digital employee. Work in this order: make_plan (3-6 steps), then do each step with the tools and call finish_step after each. Use list_tasks before adding tasks to avoid duplicates. If something is unclear or missing (for example no email address), do not guess: say so in your final reply and leave that step undone. Never send or delete without calling the approval tools. Facts in the summary must come only from the user's notes; never invent details. Before finishing, call list_tasks to verify the result. Final reply: two short sentences, what you did and anything you need from the user.`;
+
+$('run').onclick=async()=>{
+ const goal=$('goal').value.trim();$('msg').textContent='';
+ if(!goal){$('msg').textContent='Tell me what to do first.';return}
+ plan=[];summary='';log=[];render();$('run').disabled=true;$('run').textContent='Working…';
+ try{
+  const sample=await claude.use('sample');
+  if(!sample){$('msg').textContent='The AI engine is not available in this view.';return}
+  const input=SYS+'\n\nGOAL: '+goal+'\n\nNOTES:\n'+($('notes').value.trim()||'(none)')+'\n\nCURRENT TASKS: '+JSON.stringify(tasks);
+  const r=await sample(input,{tools,cache:false});
+  note('Agent: '+(r.text||'').trim());
+  const open=plan.filter(p=>!p.done).length;
+  if(plan.length&&open)note('⚠ '+open+' step(s) not completed. Check above and tell me what is missing.');
+  else if(!plan.length)note('⚠ No plan was made. Try rephrasing.');
+ }catch(e){$('msg').textContent=(e&&e.code==='not_granted')?'Permission was not granted.':'Something went wrong: '+((e&&e.message)||e)}
+ finally{$('run').disabled=false;$('run').textContent='Do it';render()}
+};
+
+$('ex').onclick=()=>{
+ $('goal').value='Turn my meeting notes into tasks, remove tasks that are no longer needed, and prepare a short summary to email to my manager.';
+ $('notes').value='Team sync Tue:\n- Launch moved to Nov 20. Priya to finalise pricing page by Nov 5.\n- Need to get 3 quotes for the print vendor, I will do this by Friday.\n- Venue is now online-only, so no need to book the venue anymore.\n- Dev wants a demo video before launch, owner not decided.\n- Risk: payment provider approval still pending.';
+ tasks=[{id:nid++,title:'Book venue',due:'',done:false}];save();render();
+};
+render();
+</script></body></html>
